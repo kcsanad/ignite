@@ -1,0 +1,17 @@
+<persistence keyspace="IgniteAddress" table="Address">
+	<keyspaceOptions>
+		REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1}
+		AND DURABLE_WRITES = true
+	</keyspaceOptions>
+	<keyPersistence class="java.lang.Long" strategy="PRIMITIVE" column="id"/>
+	<valuePersistence class="hu.greatit.demo.ignite.services.address.common.Address" 
+						strategy="BLOB"
+						serializer="org.apache.ignite.cache.store.cassandra.serializer.KryoSerializer">
+		<field name="addrid" index="true" column="addr_id"/>
+		<field name="zip" />
+		<field name="city"  index="true" />
+		<field name="street" />
+		<field name="houseno" />
+		<field name="addressCableTypes" column="addr_cable_types" />
+	</valuePersistence>
+</persistence>

@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+	<bean id="loadBalancingPolicy" class="com.datastax.driver.core.policies.TokenAwarePolicy">
+		<constructor-arg
+			type="com.datastax.driver.core.policies.LoadBalancingPolicy">
+			<bean class="com.datastax.driver.core.policies.RoundRobinPolicy" />
+		</constructor-arg>
+	</bean>
+
+	<bean class="org.apache.ignite.cache.store.cassandra.datasource.DataSource"
+		name="cassandra">
+		<property name="contactPoints" value="cassandra.ignitenet" />
+		<property name="readConsistency" value="ONE" />
+		<property name="writeConsistency" value="ONE" />
+		<property name="loadBalancingPolicy" ref="loadBalancingPolicy" />
+		<!-- <property name="user" value="demo" /> <property name="password" value="welcome1" 
+			/> -->
+		<!-- other bean properties: https://apacheignite-mix.readme.io/docs/base-concepts -->
+	</bean>
+
+	<!-- Persistence settings for 'AddressCache' -->
+	<bean id="AddressCache_settings"
+		class="org.apache.ignite.cache.store.cassandra.persistence.KeyValuePersistenceSettings">
+		<constructor-arg type="org.springframework.core.io.Resource"
+			value="classpath:PersistenceSettingsAddress.xml" />
+	</bean>
+
+	<bean class="org.apache.ignite.configuration.IgniteConfiguration">
+
+		<!-- Enabling the peer-class loading feature. -->
+		<property name="peerClassLoadingEnabled" value="true" />
+
+		<!-- Labeling Data Nodes with special attribute. This attribute is checked 
+			by common.filters.DataNodeFilters which decides where caches have to be deployed. -->
+		<property name="userAttributes">
+			<map key-type="java.lang.String" value-type="java.lang.Boolean">
+				<entry key="address.data.node" value="true" />
+			</map>
+		</property>
+
+		<!-- Redefining maximum memory size for the cluster node usage. -->
+		<property name="dataStorageConfiguration">
+			<bean class="org.apache.ignite.configuration.DataStorageConfiguration">
+				<!-- Redefining the default region's settings -->
+				<property name="defaultDataRegionConfiguration">
+					<bean class="org.apache.ignite.configuration.DataRegionConfiguration">
+						<property name="name" value="Default_Region" />
+						<!-- Setting the size of the default region to 500MB. -->
+						<property name="maxSize" value="#{500L * 1024 * 1024}" />
+					</bean>
+				</property>
+				<property name="dataRegionConfigurations">
+					<list>
+						<!-- Defining a data region that will consume up to 500 MB of RAM and 
+							will have eviction and persistence enabled. -->
+						<bean class="org.apache.ignite.configuration.DataRegionConfiguration">
+							<!-- Custom region name. -->
+							<property name="name" value="200MB_Region" />
+
+							<!-- 100 MB initial size. -->
+							<property name="initialSize" value="#{100L * 1024 * 1024}" />
+
+							<!-- 200 MB maximum size. -->
+							<property name="maxSize" value="#{200L * 1024 * 1024}" />
+
+							<!-- Disable persistence for the region. -->
+							<property name="persistenceEnabled" value="false" />
+						</bean>
+					</list>
+				</property>
+			</bean>
+		</property>
+
+		<property name="cacheConfiguration">
+			<list>
+			
+				<!-- Cache for Person records -->
+				<bean class="org.apache.ignite.configuration.CacheConfiguration">
+					<!-- Assigning the cache to the `200MB_Region` defined earlier. -->
+					<property name="dataRegionName" value="200MB_Region" />
+
+					<property name="name" value="AddressCache" />
+
+					<!-- Enabling a special nodes filter for the cache. The filter will 
+						make sure that the cache will be deployed only on Data Nodes, the nodes that 
+						have 'data.node' attribute in the local node map. -->
+					<property name="nodeFilter">
+						<bean class="hu.greatit.demo.ignite.common.filters.DataNodeFilter" />
+					</property>
+
+					<!-- Avoid Maintenance objects deserialization on data nodes side when 
+						they are passed to SampleCacheStore. <property name="storeKeepBinary" value="true"/> -->
+					<property name="cacheMode" value="PARTITIONED" />
+					<property name="backups" value="0" />
+					<property name="writeThrough" value="true" />
+					<property name="readThrough" value="true" />
+					<property name="sqlSchema" value="Address" />
+					<property name="indexedTypes">
+						<list>
+							<value type="java.lang.Class">java.lang.Long</value>
+							<value type="java.lang.Class">hu.greatit.demo.ignite.services.address.common.Address
+							</value>
+						</list>
+					</property>
+					<property name="cacheStoreFactory">
+						<bean
+							class="org.apache.ignite.cache.store.cassandra.CassandraCacheStoreFactory">
+							<property name="dataSource" ref="cassandra" />
+							<property name="persistenceSettingsBean" value="AddressCache_settings" />
+						</bean>
+					</property>
+				</bean>
+
+			</list>
+		</property>
+
+		<property name="discoverySpi">
+			<bean class="org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi">
+				<property name="ipFinder">
+					<bean
+						class="org.apache.ignite.spi.discovery.tcp.ipfinder.multicast.TcpDiscoveryMulticastIpFinder">
+						<property name="multicastGroup" value="228.10.10.157" />
+					</bean>
+				</property>
+			</bean>
+		</property>
+		
+	</bean>
+
+</beans>

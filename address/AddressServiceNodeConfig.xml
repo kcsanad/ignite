@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+        http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        ">
+
+
+	<bean class="org.apache.ignite.configuration.IgniteConfiguration">
+		<!-- Enabling the peer-class loading feature. -->
+		<property name="peerClassLoadingEnabled" value="true" />
+
+		<!-- Labeling Vehicle Service nodes with special attribute. This attribute 
+			is checked by common.filters.VehicleServiceFilter. Due to the filter, the 
+			VehicleService might be deployed only on the nodes with this special attribute 
+			set. -->
+		<property name="userAttributes">
+			<map key-type="java.lang.String" value-type="java.lang.Boolean">
+				<entry key="address.service.node" value="true" />
+			</map>
+		</property>
+
+		<!-- Redefining maximum memory size for the cluster node usage. -->
+		<property name="dataStorageConfiguration">
+			<bean class="org.apache.ignite.configuration.DataStorageConfiguration">
+				<!-- Redefining the default region's settings -->
+				<property name="defaultDataRegionConfiguration">
+					<bean class="org.apache.ignite.configuration.DataRegionConfiguration">
+						<property name="name" value="Default_Region" />
+						<!-- Setting the size of the default region to 500MB. -->
+						<property name="maxSize" value="#{500L * 1024 * 1024}" />
+					</bean>
+				</property>
+				<property name="dataRegionConfigurations">
+					<list>
+						<!-- Defining a data region that will consume up to 500 MB of RAM and 
+							will have eviction and persistence enabled. -->
+						<bean class="org.apache.ignite.configuration.DataRegionConfiguration">
+							<!-- Custom region name. -->
+							<property name="name" value="200MB_Region" />
+
+							<!-- 100 MB initial size. -->
+							<property name="initialSize" value="#{100L * 1024 * 1024}" />
+
+							<!-- 200 MB maximum size. -->
+							<property name="maxSize" value="#{200L * 1024 * 1024}" />
+
+							<!-- Disable persistence for the region. -->
+							<property name="persistenceEnabled" value="false" />
+						</bean>
+					</list>
+				</property>
+			</bean>
+		</property>
+
+		<property name="serviceConfiguration">
+			<list>
+				<!-- Setting up CustomerService. The service will be deployed automatically 
+					according to the configuration below. -->
+				<bean class="org.apache.ignite.services.ServiceConfiguration">
+					<!-- Unique service name -->
+					<property name="name" value="AddressService" />
+
+					<!-- Service implementation's class -->
+					<property name="service">
+						<bean class="hu.greatit.demo.ignite.services.address.AddressServiceImpl" />
+					</property>
+
+					<!-- Only one instance of the service will be deployed cluster wide -->
+					<property name="totalCount" value="2" />
+
+					<!-- Only one instance of the service can be deployed on a single node. -->
+					<property name="maxPerNodeCount" value="1" />
+
+					<!-- Enabling a special nodes filter for this service. The filter will 
+						make sure that the service will be deployed only on the nodes that have 'vehicle.service.node' 
+						attribute in the local node map. -->
+					<property name="nodeFilter">
+						<bean class="hu.greatit.demo.ignite.common.filters.AddressServiceFilter" />
+					</property>
+				</bean>
+			</list>
+		</property>
+
+		<property name="discoverySpi">
+			<bean class="org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi">
+				<property name="ipFinder">
+					<bean
+						class="org.apache.ignite.spi.discovery.tcp.ipfinder.multicast.TcpDiscoveryMulticastIpFinder">
+						<property name="multicastGroup" value="228.10.10.157" />
+					</bean>
+				</property>
+			</bean>
+		</property>
+
+	</bean>
+</beans>
